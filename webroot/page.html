@@ -248,8 +248,6 @@
       background: #999;
       border-radius: 5px;
       cursor: pointer;
-      min-width: 20px;
-      transition: width 0.2s ease;
     }
 
     /* Bottom Bar */
@@ -300,14 +298,98 @@
     .spacer {
       flex: 1;
     }
+
+    /* Custom Confirmation Dialog */
+    .confirmation-dialog {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #2d2d2d;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      min-width: 300px;
+    }
+
+    .confirmation-dialog.show {
+      display: block;
+    }
+
+    .confirmation-dialog h3 {
+      margin: 0 0 15px 0;
+      color: #fff;
+      font-size: 16px;
+    }
+
+    .confirmation-dialog .buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .confirmation-dialog button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+
+    .confirmation-dialog .cancel-button {
+      background: #4d4d4d;
+      color: #fff;
+    }
+
+    .confirmation-dialog .confirm-button {
+      background: #0078d4;
+      color: #fff;
+    }
+
+    .confirmation-dialog .cancel-button:hover {
+      background: #5d5d5d;
+    }
+
+    .confirmation-dialog .confirm-button:hover {
+      background: #006cbd;
+    }
+
+    .dialog-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+
+    .dialog-overlay.show {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Add confirmation dialog -->
+    <div class="dialog-overlay"></div>
+    <div class="confirmation-dialog">
+      <h3>Clear All Notes</h3>
+      <p>Are you sure you want to clear all notes? This action cannot be undone.</p>
+      <div class="buttons">
+        <button class="cancel-button">Cancel</button>
+        <button class="confirm-button">Clear</button>
+      </div>
+    </div>
+
     <!-- Top Bar -->
     <div class="top-bar">
       <div class="selected-note">
-        <span>Selected:</span>
+        <span>Instruments</span>
         <button class="note-button active" data-note="piano">
           <img src="icons/icon1.png" alt="Piano" title="Piano">
         </button>
@@ -320,6 +402,18 @@
         <button class="note-button" data-note="synth">
           <img src="icons/icon4.png" alt="Synth" title="Synth">
         </button>
+        <button class="note-button" data-note="bell">
+          <img src="icons/icon5.png" alt="Bell" title="Bell">
+        </button>
+        <button class="note-button" data-note="flute">
+          <img src="icons/icon6.png" alt="Flute" title="Flute">
+        </button>
+        <button class="note-button" data-note="guitar">
+          <img src="icons/icon7.png" alt="Guitar" title="Guitar">
+        </button>
+        <button class="note-button" data-note="strings">
+          <img src="icons/icon8.png" alt="Strings" title="Strings">
+        </button>
       </div>
       <div class="time-signature">
         <span>Time:</span>
@@ -329,7 +423,9 @@
           <option>6/8</option>
         </select>
       </div>
-      <button id="eraser-button">E</button>
+      <button id="eraser-button" class="note-button">
+        <img src="icons/eraserIcon.png" alt="Eraser" title="Eraser">
+      </button>
     </div>
 
     <!-- Grid Area -->
