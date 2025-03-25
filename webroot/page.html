@@ -123,6 +123,37 @@
       display: none;
     }
 
+    .bouncing-ball {
+      position: absolute;
+      top: -10px;
+      left: -4px;
+      width: 10px;
+      height: 10px;
+      background: #ff3366;
+      border-radius: 50%;
+      box-shadow: 0 0 5px rgba(255, 51, 102, 0.5);
+      pointer-events: none;
+      transform-origin: center bottom;
+      opacity: 1;
+      display: block;
+    }
+
+    @keyframes bounce {
+      0% {
+        transform: translateY(0) scaleY(1);
+      }
+      50% {
+        transform: translateY(30px) scaleY(0.8);
+      }
+      100% {
+        transform: translateY(0) scaleY(1);
+      }
+    }
+
+    .bouncing-ball.bounce {
+      animation: bounce 0.5s ease-in-out;
+    }
+
     .note-labels {
       position: absolute;
       left: 0;
@@ -414,6 +445,9 @@
         <button class="note-button" data-note="strings">
           <img src="icons/icon8.png" alt="Strings" title="Strings">
         </button>
+        <button class="note-button" data-note="organ">
+          <img src="icons/icon9.png" alt="Organ" title="Organ">
+        </button>
       </div>
       <div class="time-signature">
         <span>Time:</span>
@@ -458,7 +492,9 @@
       <div id="note-grid"></div>
       
       <!-- Add playback head -->
-      <div class="playback-head"></div>
+      <div class="playback-head">
+        <div class="bouncing-ball"></div>
+      </div>
 
       <div class="scroll-container">
         <div class="scroll-track">

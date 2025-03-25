@@ -13,6 +13,8 @@ class App {
     this.selectedNote = 'piano';
     this.isEraser = false;
     this.scrollPosition = 0;
+    this.lastBounceTime = 0;
+    this.bounceInterval = 500; // 500ms between bounces
 
     // Get references to the HTML elements
     this.grid = document.querySelector('#note-grid');
@@ -28,6 +30,7 @@ class App {
     this.timeSignature = document.querySelector('.time-signature select');
     this.measureNumbers = document.querySelector('.measure-numbers');
     this.playbackHead = document.querySelector('.playback-head');
+    this.bouncingBall = document.querySelector('.bouncing-ball');
     this.dialogOverlay = document.querySelector('.dialog-overlay');
     this.confirmationDialog = document.querySelector('.confirmation-dialog');
     this.confirmButton = document.querySelector('.confirmation-dialog .confirm-button');
@@ -36,90 +39,36 @@ class App {
     // Set up audio context
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
-    // Instrument configurations
-    this.instruments = {
-      piano: {
-        type: 'sine',
-        attack: 0.01,
-        decay: 0.2,
-        sustain: 0.3,
-        release: 0.1,
-        gain: 0.3
-      },
-      drums: {
-        type: 'square',
-        attack: 0.01,
-        decay: 0.1,
-        sustain: 0.1,
-        release: 0.1,
-        gain: 0.4
-      },
-      bass: {
-        type: 'triangle',
-        attack: 0.05,
-        decay: 0.3,
-        sustain: 0.4,
-        release: 0.2,
-        gain: 0.5
-      },
-      synth: {
-        type: 'sawtooth',
-        attack: 0.02,
-        decay: 0.2,
-        sustain: 0.3,
-        release: 0.2,
-        gain: 0.25
-      },
-      bell: {
-        type: 'sine',
-        attack: 0.01,
-        decay: 0.3,
-        sustain: 0.1,
-        release: 0.5,
-        gain: 0.2
-      },
-      flute: {
-        type: 'sine',
-        attack: 0.05,
-        decay: 0.1,
-        sustain: 0.8,
-        release: 0.3,
-        gain: 0.3
-      },
-      guitar: {
-        type: 'triangle',
-        attack: 0.02,
-        decay: 0.2,
-        sustain: 0.4,
-        release: 0.3,
-        gain: 0.4
-      },
-      strings: {
-        type: 'sine',
-        attack: 0.1,
-        decay: 0.3,
-        sustain: 0.7,
-        release: 0.4,
-        gain: 0.35
-      }
+    // Load sound files
+    this.sounds = {
+      piano: null,
+      drums: null,
+      bass: null,
+      synth: null,
+      bell: null,
+      flute: null,
+      guitar: null,
+      strings: null,
+      organ: null
     };
 
-    // Note frequencies (C4 to C5)
-    this.frequencies = [
-      523.25,  // C5 (higher C)
-      493.88,  // B
-      466.16,  // A#
-      440.00,  // A
-      415.30,  // G#
-      392.00,  // G
-      369.99,  // F#
-      349.23,  // F
-      329.63,  // E
-      311.13,  // D#
-      293.66,  // D
-      277.18,  // C#
-      261.63   // C4 (lower C)
-    ];
+    // Load all sound files
+    this.loadSound('piano', 'sounds/sound1.mp3');
+    this.loadSound('drums', 'sounds/sound2.wav');
+    this.loadSound('bass', 'sounds/sound3.mp3');
+    this.loadSound('synth', 'sounds/sound4.mp3');
+    this.loadSound('bell', 'sounds/sound5.wav');
+    this.loadSound('flute', 'sounds/sound6.wav');
+    this.loadSound('guitar', 'sounds/sound7.mp3');
+    this.loadSound('strings', 'sounds/sound8.mp3');
+    this.loadSound('organ', 'sounds/sound9.wav');
+
+    // Note frequencies (not needed anymore but keeping for reference)
+    this.noteFrequencies = {
+      'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13,
+      'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00,
+      'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+    };
 
     // Initialize state
     this.cellWidth = 0;
@@ -190,17 +139,19 @@ class App {
 
     // Add drag event listeners to the grid
     this.grid.addEventListener('mousedown', (e) => {
-      if (e.target.classList.contains('grid-cell')) {
+      const cell = e.target.classList.contains('grid-cell') ? e.target : e.target.parentElement;
+      if (cell.classList.contains('grid-cell')) {
         this.isDragging = true;
-        this.lastDraggedCell = e.target;
-        this.toggleNote(e.target);
+        this.lastDraggedCell = cell;
+        this.toggleNote(cell);
       }
     });
 
     this.grid.addEventListener('mousemove', (e) => {
-      if (this.isDragging && e.target.classList.contains('grid-cell') && e.target !== this.lastDraggedCell) {
-        this.lastDraggedCell = e.target;
-        this.toggleNote(e.target);
+      const cell = e.target.classList.contains('grid-cell') ? e.target : e.target.parentElement;
+      if (this.isDragging && cell.classList.contains('grid-cell') && cell !== this.lastDraggedCell) {
+        this.lastDraggedCell = cell;
+        this.toggleNote(cell);
       }
     });
 
@@ -335,7 +286,8 @@ class App {
       'bell': 5,
       'flute': 6,
       'guitar': 7,
-      'strings': 8
+      'strings': 8,
+      'organ': 9
     };
     return instrumentMap[instrument];
   }
@@ -438,8 +390,25 @@ class App {
       this.playbackHead.style.display = 'block';
       const pixelPosition = this.gridLeft + (currentVisibleBeat * this.cellWidth);
       this.playbackHead.style.left = `${pixelPosition}px`;
+
+      // Check if there are any notes at the current beat
+      const hasNotes = this.notes[currentVisibleBeat + startBeat]?.some(note => note !== null);
+      
+      // Update bouncing ball animation
+      if (hasNotes) {
+        const now = Date.now();
+        if (now - this.lastBounceTime >= this.bounceInterval) {
+          this.bouncingBall.style.animation = 'none';
+          this.bouncingBall.offsetHeight; // Trigger reflow
+          this.bouncingBall.style.animation = 'bounce 0.5s ease-in-out infinite';
+          this.lastBounceTime = now;
+        }
+      } else {
+        this.bouncingBall.style.animation = 'none';
+      }
     } else {
       this.playbackHead.style.display = 'none';
+      this.bouncingBall.style.animation = 'none';
     }
   }
 
@@ -455,30 +424,46 @@ class App {
     }
   }
 
-  playNote(noteIndex, beat) {
-    const frequency = this.frequencies[noteIndex];
-    const instrument = this.instruments[this.notes[beat][noteIndex]];
+  async loadSound(instrument, url) {
+    try {
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      this.sounds[instrument] = audioBuffer;
+      console.log(`Loaded sound for ${instrument}`);
+    } catch (error) {
+      console.error(`Error loading sound for ${instrument}:`, error);
+    }
+  }
+
+  playNote(row, col) {
+    if (!this.isPlaying) {
+      this.audioContext.resume();
+    }
     
-    const oscillator = this.audioContext.createOscillator();
-    const gainNode = this.audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(this.audioContext.destination);
-    
-    oscillator.type = instrument.type;
-    oscillator.frequency.value = frequency;
-    
-    const now = this.audioContext.currentTime;
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(instrument.gain, now + instrument.attack);
-    gainNode.gain.linearRampToValueAtTime(instrument.gain * instrument.sustain, now + instrument.attack + instrument.decay);
-    gainNode.gain.linearRampToValueAtTime(0, now + instrument.attack + instrument.decay + instrument.release);
-    
-    oscillator.start(now);
-    oscillator.stop(now + instrument.attack + instrument.decay + instrument.release);
-    
-    // Ensure audio context is running (needed for browsers' autoplay policies)
-    this.audioContext.resume();
+    const note = this.notes[col][row];
+    if (note && this.sounds[note]) {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.sounds[note];
+      
+      // Create gain node for volume control
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = 0.5; // Adjust volume as needed
+      
+      // Create pitch shifter using playbackRate
+      // Calculate pitch shift based on row position (12 semitones per octave)
+      // Row 0 (top) is highest pitch, row 12 (bottom) is lowest pitch
+      const semitones = 12 - row; // Number of semitones to shift
+      const pitchShift = Math.pow(2, semitones / 12); // Convert semitones to frequency ratio
+      source.playbackRate.value = pitchShift;
+      
+      // Connect nodes
+      source.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      // Play the sound
+      source.start(0);
+    }
   }
 
   adjustTempo(delta) {
@@ -570,31 +555,28 @@ class App {
     this.cancelButton.addEventListener('click', handleCancel);
   }
 
-  playPreviewNote(instrumentName) {
-    // Play middle C (C4) as preview
-    const frequency = this.frequencies[0];
-    const instrument = this.instruments[instrumentName];
-    
-    const oscillator = this.audioContext.createOscillator();
-    const gainNode = this.audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(this.audioContext.destination);
-    
-    oscillator.type = instrument.type;
-    oscillator.frequency.value = frequency;
-    
-    const now = this.audioContext.currentTime;
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(instrument.gain, now + instrument.attack);
-    gainNode.gain.linearRampToValueAtTime(instrument.gain * instrument.sustain, now + instrument.attack + instrument.decay);
-    gainNode.gain.linearRampToValueAtTime(0, now + instrument.attack + instrument.decay + instrument.release);
-    
-    oscillator.start(now);
-    oscillator.stop(now + instrument.attack + instrument.decay + instrument.release);
-    
-    // Ensure audio context is running (needed for browsers' autoplay policies)
-    this.audioContext.resume();
+  playPreviewNote(instrument) {
+    if (this.sounds[instrument]) {
+      this.audioContext.resume();
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.sounds[instrument];
+      
+      // Create gain node for volume control
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = 0.3; // Lower volume for preview
+      
+      // Play preview note at middle pitch (row 6)
+      const semitones = 6; // Middle pitch
+      const pitchShift = Math.pow(2, semitones / 12);
+      source.playbackRate.value = pitchShift;
+      
+      // Connect nodes
+      source.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      // Play the sound
+      source.start(0);
+    }
   }
 
   /**
